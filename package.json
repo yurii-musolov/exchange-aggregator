@@ -1,0 +1,25 @@
+{
+  "name": "exchange-aggregator",
+  "version": "0.1.0",
+  "description": "",
+  "author": "",
+  "private": false,
+  "license": "MIT",
+  "scripts": {
+    "example:rest": "ts-node examples/rest.ts"
+  },
+  "engines": {
+    "node": "^23.6"
+  },
+  "dependencies": {
+    "binance": "^2.15.2",
+    "bybit-api": "^3.10.28"
+  },
+  "devDependencies": {
+    "@tsconfig/node23": "^23.0.0",
+    "@types/node": "^22.10.5",
+    "ts-node": "^10.9.2",
+    "tslib": "^2.8.1",
+    "typescript": "^5.7.3"
+  }
+}
