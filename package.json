@@ -6,7 +6,8 @@
   "private": false,
   "license": "MIT",
   "scripts": {
-    "example:rest": "ts-node examples/rest.ts"
+    "example:rest": "ts-node examples/rest.ts",
+    "example:ws": "ts-node examples/ws.ts"
   },
   "engines": {
     "node": "^23.6"

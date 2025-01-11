@@ -1,18 +1,44 @@
-import { MainClient, USDMClient, CoinMClient } from 'binance';
+import { MainClient, USDMClient, CoinMClient, WebsocketClient } from 'binance'
 
-import { Exchanger } from "@/aggregator";
-import { Candle, GetCandlesParams, Schema, Ticker } from "./../../def";
-import { fromKline, fromSymbolPrice, toKlineInterval } from './map';
+import { CandlesSubs, Cb, Exchanger, TikerSubs, UnsubCb } from "@/aggregator"
+import { Candle, GetCandlesParams, Schema, Ticker } from "./../../def"
+import { fromKline, fromSymbolPrice, toKlineInterval, toMarket } from './map'
 
 export class BinanceExchange implements Exchanger {
-  private mainClient: MainClient
-  private usdmClient: USDMClient
-  private coinMClient: CoinMClient
+  private readonly mainClient: MainClient
+  private readonly usdmClient: USDMClient
+  private readonly coinmClient: CoinMClient
+  private readonly wsClient: WebsocketClient
+  private readonly handlers: Set<Cb>
 
-  constructor(mainClient: MainClient, usdmClient: USDMClient, coinMClient: CoinMClient) {
+  constructor(mainClient: MainClient, usdmClient: USDMClient, coinmClient: CoinMClient, wsClient: WebsocketClient) {
     this.mainClient = mainClient
     this.usdmClient = usdmClient
-    this.coinMClient = coinMClient
+    this.coinmClient = coinmClient
+    this.wsClient = wsClient
+    this.handlers = new Set()
+
+    this.wsClient.on('message', (data) => {
+      this.handlers.forEach(cb => cb(data))
+    })
+    this.wsClient.on('formattedMessage', (data) => {
+      this.handlers.forEach(cb => cb(data))
+    })
+    this.wsClient.on('open', (data) => {
+      console.log('connection opened open:', data.wsKey, data.ws.target.url)
+    })
+    this.wsClient.on('reply', (data) => {
+      console.log('log reply: ', JSON.stringify(data, null, 2))
+    })
+    this.wsClient.on('reconnecting', (data) => {
+      console.log('ws automatically reconnecting.... ', data?.wsKey)
+    })
+    this.wsClient.on('reconnected', (data) => {
+      console.log('ws has reconnected ', data?.wsKey)
+    })
+    this.wsClient.on('error', (data) => {
+      console.log('ws saw error ', data?.wsKey)
+    })
   }
 
   async getTikers(schema: Schema): Promise<Array<Ticker>> {
@@ -24,7 +50,7 @@ export class BinanceExchange implements Exchanger {
       case 'futures_usdt':
         return this.usdmClient.getSymbolPriceTicker().then(fromSymbolPrice)
       case 'futures_coin':
-        return this.coinMClient.getSymbolPriceTicker().then(fromSymbolPrice)
+        return this.coinmClient.getSymbolPriceTicker().then(fromSymbolPrice)
 
       default:
         throw new Error(`unreachable case: schema: ${schema}`)
@@ -48,10 +74,37 @@ export class BinanceExchange implements Exchanger {
       case 'futures_usdt':
         return this.usdmClient.getKlines(kLinesParams).then(klines => klines.map(fromKline))
       case 'futures_coin':
-        return this.coinMClient.getKlines(kLinesParams).then(klines => klines.map(fromKline))
+        return this.coinmClient.getKlines(kLinesParams).then(klines => klines.map(fromKline))
 
       default:
         throw new Error(`unreachable case: schema: ${schema}`)
     }
+  }
+
+  async subscribeTiker(schema: Schema, sub: TikerSubs, cb: Cb): Promise<UnsubCb> {
+    this.handlers.add(cb)
+    const w = this.wsClient.subscribeSymbol24hrTicker(sub.symbol, toMarket(schema))
+    w.wsKey
+    // TODO: implement promisification
+    return async () => this.unsubscribeTiker(schema, sub, cb)
+  }
+
+  async unsubscribeTiker(schema: Schema, sub: TikerSubs, cb: Cb): Promise<void> {
+    this.handlers.delete(cb)
+    // TODO: implement promisification
+    // TODO: use unsubscribe method
+  }
+
+  async subscribeCandles(schema: Schema, sub: CandlesSubs, cb: Cb): Promise<UnsubCb> {
+    this.handlers.add(cb)
+    this.wsClient.subscribeKlines(sub.symbol, toKlineInterval(sub.interval), toMarket(schema))
+    // TODO: implement promisification
+    return async () => this.unsubscribeCandles(schema, sub, cb)
+  }
+
+  async unsubscribeCandles(schema: Schema, sub: CandlesSubs, cb: Cb): Promise<void> {
+    this.handlers.delete(cb)
+    // TODO: implement promisification
+    // TODO: use unsubscribe method
   }
 }

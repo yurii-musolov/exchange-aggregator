@@ -1,6 +1,6 @@
 import { SymbolPrice, KlineInterval, Kline } from 'binance';
 
-import { Candle, Interval, Ticker } from "./../../def";
+import { Candle, Interval, Schema, Ticker } from "./../../def";
 
 export const fromSymbolPrice = (v: SymbolPrice | Array<SymbolPrice>): Array<Ticker> => {
   if (Array.isArray(v)) return v.map(sp => ({
@@ -69,3 +69,19 @@ export const fromKline = (kline: Kline): Candle => ({
   low: +kline[3],
   volume: +kline[5],
 })
+
+export const toMarket = (schema: Schema): 'spot' | 'usdm' | 'coinm' => {
+  switch (schema) {
+    case 'spot':
+      return 'spot'
+    case 'margin':
+      return 'spot'
+    case 'futures_usdt':
+      return 'usdm'
+    case 'futures_coin':
+      return 'coinm'
+
+    default:
+      throw new Error(`unreachable case: schema: ${schema}`)
+  }
+}
